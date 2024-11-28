@@ -766,7 +766,7 @@ func (r *ClusterDeploymentReconciler) reconcileCredentialPropagation(ctx context
 			})
 		case "openstack":
 			l.Info("OpenStack creds propagation start")
-			if err := credspropagation.PropagateOpenStackSecrets(ctx, propnCfg); err != nil {
+			if err := credspropagation.PropagateOpenStackSecrets(ctx, propnCfg, credential); err != nil {
 				errMsg := fmt.Sprintf("failed to create OpenStack CCM credentials: %s", err)
 				apimeta.SetStatusCondition(clusterDeployment.GetConditions(), metav1.Condition{
 					Type:    hmc.CredentialsPropagatedCondition,
