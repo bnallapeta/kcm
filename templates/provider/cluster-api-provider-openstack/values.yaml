@@ -1,6 +1,6 @@
 configSecret:
-  create: false
-  name: ""
+  create: true
+  name: "openstack-variables"
   namespace: ""
 
 config: {}

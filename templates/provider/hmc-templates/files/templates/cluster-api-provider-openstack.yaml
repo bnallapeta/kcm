@@ -6,10 +6,5 @@ metadata:
     helm.sh/resource-policy: keep
 spec:
   helm:
-    chartSpec:
-      chart: cluster-api-provider-openstack
-      version: 0.0.1
-      interval: 10m0s
-      sourceRef:
-        kind: HelmRepository
-        name: hmc-templates
+    chartName: cluster-api-provider-openstack
+    chartVersion: 0.0.1
