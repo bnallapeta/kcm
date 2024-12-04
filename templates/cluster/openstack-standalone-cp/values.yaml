@@ -11,9 +11,9 @@ clusterNetwork:
   serviceDomain: "cluster.local"
 
 identityRef:
-  name: ""
-  cloudName: ""
-  region: ""
+  name: "openstack-cloud-config"
+  cloudName: "openstack"
+  region: "RegionOne"
 
 bastion:
   enabled: false
@@ -35,7 +35,7 @@ apiServerLoadBalancer:
 
 externalNetwork:
   filter:
-    name: ""
+    name: "public"
 
 controlplane:
   sshPublicKey: ""
