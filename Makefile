@@ -352,7 +352,7 @@ helm-push: helm-package
 	done
 
 .PHONY: dev-push
-dev-push: docker-buildx helm-push
+dev-push: docker-build helm-push
     $(CONTAINER_TOOL) push ${IMG}
 
 .PHONY: dev-templates
