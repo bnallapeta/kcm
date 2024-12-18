@@ -3,7 +3,7 @@ VERSION ?= $(shell git describe --tags --always)
 VERSION := $(patsubst v%,%,$(VERSION))
 FQDN_VERSION = $(subst .,-,$(VERSION))
 # Image URL to use all building/pushing image targets
-IMG ?= localhost/hmc/controller:latest
+IMG ?= ghcr.io/bnallapeta/hmc-controller:latest
 IMG_REPO = $(shell echo $(IMG) | cut -d: -f1)
 IMG_TAG = $(shell echo $(IMG) | cut -d: -f2)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
@@ -224,9 +224,10 @@ KIND_CLUSTER_NAME ?= hmc-dev
 KIND_NETWORK ?= kind
 REGISTRY_NAME ?= hmc-local-registry
 REGISTRY_PORT ?= 5001
-REGISTRY_REPO ?= oci://127.0.0.1:$(REGISTRY_PORT)/charts
-DEV_PROVIDER ?= aws
-REGISTRY_IS_OCI = $(shell echo $(REGISTRY_REPO) | grep -q oci && echo true || echo false)
+REGISTRY_REPO ?= oci://ghcr.io/bnallapeta/charts
+DEV_PROVIDER ?= openstack
+# REGISTRY_IS_OCI = $(shell echo $(REGISTRY_REPO) | grep -q oci && echo true || echo false)
+REGISTRY_IS_OCI = false
 AWS_CREDENTIALS=${AWS_B64ENCODED_CREDENTIALS}
 
 ifndef ignore-not-found
@@ -245,15 +246,19 @@ kind-undeploy: kind
 		$(KIND) delete cluster --name $(KIND_CLUSTER_NAME); \
 	fi
 
-.PHONY: registry-deploy
-registry-deploy:
-	@if [ ! "$$($(CONTAINER_TOOL) ps -aq -f name=$(REGISTRY_NAME))" ]; then \
-		echo "Starting new local registry container $(REGISTRY_NAME)"; \
-		$(CONTAINER_TOOL) run -d --restart=always -p "127.0.0.1:$(REGISTRY_PORT):5000" --network bridge --name "$(REGISTRY_NAME)" registry:2; \
-	fi; \
-	if [ "$$($(CONTAINER_TOOL) inspect -f='{{json .NetworkSettings.Networks.$(KIND_NETWORK)}}' $(REGISTRY_NAME))" = 'null' ]; then \
-		$(CONTAINER_TOOL) network connect $(KIND_NETWORK) $(REGISTRY_NAME); \
-	fi
+# .PHONY: registry-deploy
+# registry-deploy:
+# 	@if [ ! "$$($(CONTAINER_TOOL) ps -aq -f name=$(REGISTRY_NAME))" ]; then \
+# 		echo "Starting new local registry container $(REGISTRY_NAME)"; \
+# 		$(CONTAINER_TOOL) run -d --restart=always -p "127.0.0.1:$(REGISTRY_PORT):5000" --network bridge --name "$(REGISTRY_NAME)" registry:2; \
+# 	fi; \
+# 	if [ "$$($(CONTAINER_TOOL) inspect -f='{{json .NetworkSettings.Networks.$(KIND_NETWORK)}}' $(REGISTRY_NAME))" = 'null' ]; then \
+# 		$(CONTAINER_TOOL) network connect $(KIND_NETWORK) $(REGISTRY_NAME); \
+# 	fi
+
+# .PHONY: registry-deploy
+# registry-deploy:
+#     @echo "Skipping registry-deploy as Docker Hub is being used."
 
 .PHONY: registry-undeploy
 registry-undeploy:
@@ -266,15 +271,23 @@ registry-undeploy:
 hmc-deploy: helm
 	$(HELM) upgrade --values $(HMC_VALUES) --reuse-values --install --create-namespace hmc $(PROVIDER_TEMPLATES_DIR)/hmc -n $(NAMESPACE)
 
+# .PHONY: dev-deploy
+# dev-deploy: yq ## Deploy HMC helm chart to the K8s cluster specified in ~/.kube/config.
+# 	@$(YQ) eval -i '.image.repository = "$(IMG_REPO)"' config/dev/hmc_values.yaml
+# 	@$(YQ) eval -i '.image.tag = "$(IMG_TAG)"' config/dev/hmc_values.yaml
+# 	@if [ "$(REGISTRY_REPO)" = "oci://127.0.0.1:$(REGISTRY_PORT)/charts" ]; then \
+# 		$(YQ) eval -i '.controller.defaultRegistryURL = "oci://$(REGISTRY_NAME):5000/charts"' config/dev/hmc_values.yaml; \
+# 	else \
+# 		$(YQ) eval -i '.controller.defaultRegistryURL = "$(REGISTRY_REPO)"' config/dev/hmc_values.yaml; \
+# 	fi; \
+# 	$(MAKE) hmc-deploy HMC_VALUES=config/dev/hmc_values.yaml
+# 	$(KUBECTL) rollout restart -n $(NAMESPACE) deployment/hmc-controller-manager
+
 .PHONY: dev-deploy
 dev-deploy: yq ## Deploy HMC helm chart to the K8s cluster specified in ~/.kube/config.
 	@$(YQ) eval -i '.image.repository = "$(IMG_REPO)"' config/dev/hmc_values.yaml
 	@$(YQ) eval -i '.image.tag = "$(IMG_TAG)"' config/dev/hmc_values.yaml
-	@if [ "$(REGISTRY_REPO)" = "oci://127.0.0.1:$(REGISTRY_PORT)/charts" ]; then \
-		$(YQ) eval -i '.controller.defaultRegistryURL = "oci://$(REGISTRY_NAME):5000/charts"' config/dev/hmc_values.yaml; \
-	else \
-		$(YQ) eval -i '.controller.defaultRegistryURL = "$(REGISTRY_REPO)"' config/dev/hmc_values.yaml; \
-	fi; \
+	@$(YQ) eval -i '.controller.defaultRegistryURL = "$(REGISTRY_REPO)"' config/dev/hmc_values.yaml
 	$(MAKE) hmc-deploy HMC_VALUES=config/dev/hmc_values.yaml
 	$(KUBECTL) rollout restart -n $(NAMESPACE) deployment/hmc-controller-manager
 
@@ -282,49 +295,64 @@ dev-deploy: yq ## Deploy HMC helm chart to the K8s cluster specified in ~/.kube/
 dev-undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(HELM) delete -n $(NAMESPACE) hmc
 
+# .PHONY: helm-push
+# helm-push: helm-package
+# 	@if [ ! $(REGISTRY_IS_OCI) ]; then \
+# 	    repo_flag="--repo"; \
+# 	fi; \
+# 	for chart in $(CHARTS_PACKAGE_DIR)/*.tgz; do \
+# 		base=$$(basename $$chart .tgz); \
+# 		chart_version=$$(echo $$base | grep -o "v\{0,1\}[0-9]\+\.[0-9]\+\.[0-9].*"); \
+# 		chart_name="$${base%-"$$chart_version"}"; \
+# 		echo "Verifying if chart $$chart_name, version $$chart_version already exists in $(REGISTRY_REPO)"; \
+# 		if $(REGISTRY_IS_OCI); then \
+# 			chart_exists=$$($(HELM) pull $$repo_flag $(REGISTRY_REPO)/$$chart_name --version $$chart_version --destination /tmp 2>&1 | grep "not found" || true); \
+# 		else \
+# 			chart_exists=$$($(HELM) pull $$repo_flag $(REGISTRY_REPO) $$chart_name --version $$chart_version --destination /tmp 2>&1 | grep "not found" || true); \
+# 		fi; \
+# 		if [ -z "$$chart_exists" ]; then \
+# 			echo "Chart $$chart_name version $$chart_version already exists in the repository."; \
+# 		else \
+# 			if $(REGISTRY_IS_OCI); then \
+# 				echo "Pushing $$chart to $(REGISTRY_REPO)"; \
+# 				$(HELM) push "$$chart" $(REGISTRY_REPO); \
+# 			else \
+# 				if [ ! $$REGISTRY_USERNAME ] && [ ! $$REGISTRY_PASSWORD ]; then \
+# 					echo "REGISTRY_USERNAME and REGISTRY_PASSWORD must be populated to push the chart to an HTTPS repository"; \
+# 					exit 1; \
+# 				else \
+# 					$(HELM) repo add hmc $(REGISTRY_REPO); \
+# 					echo "Pushing $$chart to $(REGISTRY_REPO)"; \
+# 					$(HELM) cm-push "$$chart" $(REGISTRY_REPO) --username $$REGISTRY_USERNAME --password $$REGISTRY_PASSWORD; \
+# 				fi; \
+# 			fi; \
+# 		fi; \
+# 	done
+
+# kind doesn't support load docker-image if the container tool is podman
+# https://github.com/kubernetes-sigs/kind/issues/2038
+# .PHONY: dev-push
+# dev-push: docker-build helm-push
+# 	@if [ "$(CONTAINER_TOOL)" = "podman" ]; then \
+# 		$(KIND) load image-archive --name $(KIND_CLUSTER_NAME) <($(CONTAINER_TOOL) save $(IMG)); \
+# 	else \
+# 		$(KIND) load docker-image $(IMG) --name $(KIND_CLUSTER_NAME); \
+# 	fi; \
+
 .PHONY: helm-push
 helm-push: helm-package
-	@if [ ! $(REGISTRY_IS_OCI) ]; then \
-	    repo_flag="--repo"; \
-	fi; \
+	@export HELM_EXPERIMENTAL_OCI=1; \
 	for chart in $(CHARTS_PACKAGE_DIR)/*.tgz; do \
 		base=$$(basename $$chart .tgz); \
 		chart_version=$$(echo $$base | grep -o "v\{0,1\}[0-9]\+\.[0-9]\+\.[0-9].*"); \
 		chart_name="$${base%-"$$chart_version"}"; \
-		echo "Verifying if chart $$chart_name, version $$chart_version already exists in $(REGISTRY_REPO)"; \
-		if $(REGISTRY_IS_OCI); then \
-			chart_exists=$$($(HELM) pull $$repo_flag $(REGISTRY_REPO)/$$chart_name --version $$chart_version --destination /tmp 2>&1 | grep "not found" || true); \
-		else \
-			chart_exists=$$($(HELM) pull $$repo_flag $(REGISTRY_REPO) $$chart_name --version $$chart_version --destination /tmp 2>&1 | grep "not found" || true); \
-		fi; \
-		if [ -z "$$chart_exists" ]; then \
-			echo "Chart $$chart_name version $$chart_version already exists in the repository."; \
-		else \
-			if $(REGISTRY_IS_OCI); then \
-				echo "Pushing $$chart to $(REGISTRY_REPO)"; \
-				$(HELM) push "$$chart" $(REGISTRY_REPO); \
-			else \
-				if [ ! $$REGISTRY_USERNAME ] && [ ! $$REGISTRY_PASSWORD ]; then \
-					echo "REGISTRY_USERNAME and REGISTRY_PASSWORD must be populated to push the chart to an HTTPS repository"; \
-					exit 1; \
-				else \
-					$(HELM) repo add hmc $(REGISTRY_REPO); \
-					echo "Pushing $$chart to $(REGISTRY_REPO)"; \
-					$(HELM) cm-push "$$chart" $(REGISTRY_REPO) --username $$REGISTRY_USERNAME --password $$REGISTRY_PASSWORD; \
-				fi; \
-			fi; \
-		fi; \
+		echo "Pushing $$chart to $(REGISTRY_REPO)"; \
+		$(HELM) push "$$chart" $(REGISTRY_REPO); \
 	done
 
-# kind doesn't support load docker-image if the container tool is podman
-# https://github.com/kubernetes-sigs/kind/issues/2038
 .PHONY: dev-push
 dev-push: docker-build helm-push
-	@if [ "$(CONTAINER_TOOL)" = "podman" ]; then \
-		$(KIND) load image-archive --name $(KIND_CLUSTER_NAME) <($(CONTAINER_TOOL) save $(IMG)); \
-	else \
-		$(KIND) load docker-image $(IMG) --name $(KIND_CLUSTER_NAME); \
-	fi; \
+    $(CONTAINER_TOOL) push ${IMG}
 
 .PHONY: dev-templates
 dev-templates: templates-generate
