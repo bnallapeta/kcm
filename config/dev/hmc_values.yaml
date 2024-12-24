@@ -6,3 +6,4 @@ controller:
   insecureRegistry: true
   createRelease: false
   createTemplates: false
+  registryCredsSecret: ghcr-secret
