@@ -22,11 +22,11 @@ spec:
   externalNetwork:
     {{- toYaml .Values.externalNetwork | nindent 4 }}
   {{- end }}
-  {{- if .Values.clusterIdentity }}
+  {{- if .Values.identityRef }}
   identityRef:
-    name: {{ .Values.clusterIdentity.name }}
-    cloudName: {{ .Values.clusterIdentity.cloudName }}
-    region: {{ .Values.clusterIdentity.region }}
+    name: {{ .Values.identityRef.name }}
+    cloudName: {{ .Values.identityRef.cloudName }}
+    region: {{ .Values.identityRef.region }}
   {{- end }}
   {{- if .Values.managedSecurityGroups }}
   managedSecurityGroups:

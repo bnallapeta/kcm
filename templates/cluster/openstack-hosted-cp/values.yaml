@@ -11,7 +11,7 @@ clusterNetwork:
     - "10.96.0.0/12" # cidr for service network
   serviceDomain: "cluster.local"
 
-clusterIdentity:
+identityRef:
   name: "openstack-cloud-config"
   cloudName: "openstack"
   region: "RegionOne"
@@ -30,8 +30,6 @@ managedSecurityGroups:
 
 managedSubnets:
 - cidr: 10.6.0.0/24
-  dnsNameservers:
-  - 8.8.8.8
 
 # Enable/disable external load balancer for the API server
 apiServerLoadBalancer:
@@ -47,7 +45,7 @@ sshPublicKey: "bnr-vm"  # SSH public key for accessing nodes
 flavor: "m1.medium"  # OpenStack flavor for instance size
 image:
   filter:
-    name: "ubuntu-2204-kube-v1.30.5"  # Name of the image
+    name: "ubuntu-20.04"  # Name of the image
 portOpts: []  # Ports to be attached to the server instance
 securityGroups:
   - filter:

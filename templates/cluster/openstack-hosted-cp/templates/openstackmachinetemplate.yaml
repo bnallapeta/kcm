@@ -5,7 +5,7 @@ metadata:
 spec:
   template:
     spec:
-      cloudName: {{ .Values.clusterIdentity.cloudName }}
+      cloudName: {{ .Values.identityRef.cloudName }}
       flavor: {{ .Values.flavor }}
       image:
         filter:
