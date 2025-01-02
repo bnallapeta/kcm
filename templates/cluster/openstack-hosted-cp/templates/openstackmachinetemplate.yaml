@@ -5,8 +5,11 @@ metadata:
 spec:
   template:
     spec:
-      cloudName: {{ .Values.identityRef.cloudName }}
       flavor: {{ .Values.flavor }}
+      identityRef:
+        name: {{ .Values.identityRef.name }}
+        cloudName: {{ .Values.identityRef.cloudName }}
+        region: {{ .Values.identityRef.region }}
       image:
         filter:
           name: {{ .Values.image.filter.name }}
@@ -25,5 +28,5 @@ spec:
         {{ .Values.securityGroups | toYaml | nindent 8 | trim }}
       {{- end }}
       {{- if not ( .Values.sshPublicKey | empty) }}
-      sshPublicKey: {{ .Values.sshPublicKey }}
+      sshKeyName: {{ .Values.sshPublicKey }}
       {{- end }}      

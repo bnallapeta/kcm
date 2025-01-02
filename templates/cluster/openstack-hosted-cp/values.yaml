@@ -41,7 +41,7 @@ externalNetwork:
     name: "public"
 
 # openstack machine parameters
-sshPublicKey: "bnr-vm"  # SSH public key for accessing nodes
+sshKeyName: "bnr-vm"  # SSH public key for accessing nodes
 flavor: "m1.medium"  # OpenStack flavor for instance size
 image:
   filter:

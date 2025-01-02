@@ -5,7 +5,8 @@ metadata:
 spec:
   controllerPlaneFlags:
   - "--enable-cloud-provider=true"
-  - "--debug=true"
+  - "--kubelet-extra-args=--cloud-provider=external"
+  - "--disable-components=konnectivity-server"
   k0sConfig:
     apiVersion: k0s.k0sproject.io/v1beta1
     kind: ClusterConfig
@@ -28,6 +29,16 @@ spec:
                   enabled: true
                   name: openstack-cloud-config
                   create: false
+                nodeSelector:
+                  node-role.kubernetes.io/control-plane: "true"
+                tolerations:
+                  - key: node.cloudprovider.kubernetes.io/uninitialized
+                    value: "true"
+                    effect: NoSchedule
+                  - key: node-role.kubernetes.io/control-plane
+                    effect: NoSchedule
+                  - key: node-role.kubernetes.io/master
+                    effect: NoSchedule                  
             - name: openstack-csi
               chartname: openstack/openstack-cinder-csi
               version: 2.31.3
@@ -46,6 +57,10 @@ spec:
                   enabled: true
                   name: openstack-cloud-config
                   create: false
+                csi:
+                  plugin:
+                    nodePlugin:
+                      kubeletDir: /var/lib/k0s/kubelet                  
       network:
         provider: calico
         calico:

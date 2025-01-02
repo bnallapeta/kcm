@@ -168,7 +168,7 @@
           }
         }
       },
-      "sshPublicKey": {
+      "sshKeyName": {
         "type": "string",
         "description": "SSH public key for accessing nodes"
       },
