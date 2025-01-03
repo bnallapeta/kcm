@@ -1,8 +1,9 @@
 image:
   repository: ghcr.io/bnallapeta/hmc-controller
   tag: latest
+  pullPolicy: Always
 controller:
-  defaultRegistryURL: oci://ghcr.io/bnallapeta/charts
+  defaultRegistryURL: oci://hmc-local-registry:5000/charts
   insecureRegistry: true
   createRelease: false
   createTemplates: false

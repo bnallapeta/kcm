@@ -1,5 +1,5 @@
 apiVersion: hmc.mirantis.com/v1alpha1
-kind: ManagedCluster
+kind: ClusterDeployment
 metadata:
   name: openstack-dev-hosted-cp
   namespace: hmc-system
@@ -9,15 +9,14 @@ spec:
   config:
     controlPlaneNumber: 3
     workersNumber: 2
-    region: RegionOne
     controlPlane:
       flavor: m1.medium
       image:
         filter:
-          name: "ubuntu-2204-kube-v1.30.5"
+          name: "ubuntu-20.04"
     worker:
       flavor: m1.medium
       image:
         filter:
-          name: "ubuntu-2204-kube-v1.30.5"
-    authURL: ${OS_AUTH_URL}
+          name: "ubuntu-20.04"
+    authURL: "https://keystone.ic-eu.ssl.mirantis.net/"

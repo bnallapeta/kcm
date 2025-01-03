@@ -153,13 +153,17 @@ TEMPLATE_FOLDERS = $(patsubst $(TEMPLATES_DIR)/%,%,$(wildcard $(TEMPLATES_DIR)/*
 collect-airgap-providers: yq helm clusterctl $(PROVIDER_TEMPLATES_DIR) $(LOCALBIN)
 	$(SHELL) hack/collect-airgap-providers.sh
 
+# .PHONY: helm-package
+# helm-package: $(CHARTS_PACKAGE_DIR) $(EXTENSION_CHARTS_PACKAGE_DIR) helm
+# 	@if [ "$(SKIP_KIND)" = "true" ]; then \
+# 		echo "SKIP_KIND is true. Skipping helm package."; \
+# 	else \
+# 		make $(patsubst %,package-%-tmpl,$(TEMPLATE_FOLDERS)); \
+# 	fi
+
 .PHONY: helm-package
 helm-package: $(CHARTS_PACKAGE_DIR) $(EXTENSION_CHARTS_PACKAGE_DIR) helm
-	@if [ "$(SKIP_KIND)" = "true" ]; then \
-		echo "SKIP_KIND is true. Skipping helm package."; \
-	else \
-		make $(patsubst %,package-%-tmpl,$(TEMPLATE_FOLDERS)); \
-	fi
+	make $(patsubst %,package-%-tmpl,$(TEMPLATE_FOLDERS))
 
 bundle-images: dev-apply $(IMAGES_PACKAGE_DIR) ## Create a tarball with all images used by HMC.
 	@BUNDLE_TARBALL=$(IMAGES_PACKAGE_DIR)/hmc-images-$(VERSION).tgz EXTENSIONS_BUNDLE_TARBALL=$(IMAGES_PACKAGE_DIR)/hmc-extension-images-$(VERSION).tgz IMG=$(IMG) KUBECTL=$(KUBECTL) YQ=$(YQ) HELM=$(HELM) NAMESPACE=$(NAMESPACE) TEMPLATES_DIR=$(TEMPLATES_DIR) KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) $(SHELL) $(CURDIR)/scripts/bundle-images.sh
@@ -216,17 +220,28 @@ docker-push: ## Push docker image with the manager.
 PLATFORMS ?= linux/arm64,linux/amd64
 .PHONY: docker-buildx
 docker-buildx: ## Build and push docker image for the manager for cross-platform support
-	@if [ "$(SKIP_KIND)" = "true" ]; then \
-		echo "SKIP_KIND is true. Skipping docker image build."; \
-	else \
-		echo "Building and pushing docker image for $(PLATFORMS)."; \
-		sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross; \
-		$(CONTAINER_TOOL) buildx create --name project-v3-builder || true; \
-		$(CONTAINER_TOOL) buildx use project-v3-builder; \
-		$(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .; \
-		$(CONTAINER_TOOL) buildx rm project-v3-builder; \
-		rm Dockerfile.cross; \
-	fi
+	echo "Building and pushing docker image for $(PLATFORMS)."; \
+	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross; \
+	$(CONTAINER_TOOL) buildx create --name project-v3-builder || true; \
+	$(CONTAINER_TOOL) buildx use project-v3-builder; \
+	$(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .; \
+	$(CONTAINER_TOOL) buildx rm project-v3-builder; \
+	rm Dockerfile.cross; \
+
+
+# .PHONY: docker-buildx
+# docker-buildx: ## Build and push docker image for the manager for cross-platform support
+# 	@if [ "$(SKIP_KIND)" = "true" ]; then \
+# 		echo "SKIP_KIND is true. Skipping docker image build."; \
+# 	else \
+# 		echo "Building and pushing docker image for $(PLATFORMS)."; \
+# 		sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross; \
+# 		$(CONTAINER_TOOL) buildx create --name project-v3-builder || true; \
+# 		$(CONTAINER_TOOL) buildx use project-v3-builder; \
+# 		$(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .; \
+# 		$(CONTAINER_TOOL) buildx rm project-v3-builder; \
+# 		rm Dockerfile.cross; \
+# 	fi	
 
 ##@ Deployment
 
@@ -234,10 +249,9 @@ KIND_CLUSTER_NAME ?= hmc-dev
 KIND_NETWORK ?= kind
 REGISTRY_NAME ?= hmc-local-registry
 REGISTRY_PORT ?= 5001
-REGISTRY_REPO ?= oci://ghcr.io/bnallapeta/charts
+REGISTRY_REPO ?= oci://127.0.0.1:$(REGISTRY_PORT)/charts
 DEV_PROVIDER ?= openstack
-# REGISTRY_IS_OCI = $(shell echo $(REGISTRY_REPO) | grep -q oci && echo true || echo false)
-REGISTRY_IS_OCI = false
+REGISTRY_IS_OCI = $(shell echo $(REGISTRY_REPO) | grep -q oci && echo true || echo false)
 AWS_CREDENTIALS=${AWS_B64ENCODED_CREDENTIALS}
 
 ifndef ignore-not-found
@@ -246,14 +260,15 @@ endif
 
 .PHONY: kind-deploy
 kind-deploy: kind
-    @if [ "$(SKIP_KIND)" = "true" ]; then \
-        echo "SKIP_KIND is true. Skipping Kind cluster creation."; \
-    elif ! $(KIND) get clusters | grep -q "^$(KIND_CLUSTER_NAME)$$"; then \
-        echo "Creating Kind cluster $(KIND_CLUSTER_NAME)"; \
-        $(KIND) create cluster --name $(KIND_CLUSTER_NAME); \
-    else \
-        echo "Kind cluster $(KIND_CLUSTER_NAME) already exists."; \
-    fi
+	@echo "SKIP_KIND is set to '$(SKIP_KIND)'"
+	@if [ "$(SKIP_KIND)" = "true" ]; then \
+		echo "SKIP_KIND is true. Skipping Kind cluster creation."; \
+	elif ! $(KIND) get clusters | grep -q "^$(KIND_CLUSTER_NAME)$$"; then \
+		echo "Creating Kind cluster $(KIND_CLUSTER_NAME)"; \
+		$(KIND) create cluster --name $(KIND_CLUSTER_NAME); \
+	else \
+		echo "Kind cluster $(KIND_CLUSTER_NAME) already exists."; \
+	fi
 
 .PHONY: kind-undeploy
 kind-undeploy: kind
@@ -304,38 +319,77 @@ dev-undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/c
 
 .PHONY: helm-push
 helm-push: helm-package
-	@if [ "$(SKIP_KIND)" = "true" ]; then \
-	    echo "SKIP_KIND is true. Skipping Helm push."; \
-	else \
-	    export HELM_EXPERIMENTAL_OCI=1; \
-	    if [ ! $(REGISTRY_IS_OCI) ]; then \
-	        repo_flag="--repo"; \
-	    fi; \
-	    for chart in $(CHARTS_PACKAGE_DIR)/*.tgz; do \
-	        base=$$(basename $$chart .tgz); \
-	        chart_version=$$(echo $$base | grep -o "v[0-9]\+\.[0-9]\+\.[0-9].*"); \
-	        chart_name="$${base%-"$$chart_version"}"; \
-	        echo "Verifying if chart $$chart_name, version $$chart_version exists in $(REGISTRY_REPO)"; \
-	        chart_exists=$$($(HELM) pull $$repo_flag $(REGISTRY_REPO)/$$chart_name --version $$chart_version --destination /tmp 2>&1 | grep -q "not found" && echo false || echo true); \
-	        if [ "$$chart_exists" = "true" ]; then \
-	            echo "Chart $$chart_name version $$chart_version already exists in the repository."; \
-	        else \
-	            if $(REGISTRY_IS_OCI); then \
-	                echo "Pushing $$chart to OCI registry $(REGISTRY_REPO)"; \
-	                $(HELM) push "$$chart" $(REGISTRY_REPO); \
-	            else \
-	                if [ ! $$REGISTRY_USERNAME ] || [ ! $$REGISTRY_PASSWORD ]; then \
-	                    echo "Error: REGISTRY_USERNAME and REGISTRY_PASSWORD must be set for non-OCI registries."; \
-	                    echo "Example: export REGISTRY_USERNAME=myuser REGISTRY_PASSWORD=mypassword"; \
-	                    exit 1; \
-	                fi; \
-	                $(HELM) repo add hmc $(REGISTRY_REPO); \
-	                echo "Pushing $$chart to non-OCI registry $(REGISTRY_REPO)"; \
-	                $(HELM) cm-push "$$chart" $(REGISTRY_REPO) --username $$REGISTRY_USERNAME --password $$REGISTRY_PASSWORD; \
-	            fi; \
-	        fi; \
-	    done; \
-	fi
+	export HELM_EXPERIMENTAL_OCI=1; \
+	if [ ! $(REGISTRY_IS_OCI) ]; then \
+		repo_flag="--repo"; \
+	fi; \
+	for chart in $(CHARTS_PACKAGE_DIR)/*.tgz; do \
+		base=$$(basename $$chart .tgz); \
+		chart_version=$$(echo $$base | grep -oE "[0-9]+\.[0-9]+\.[0-9]+"); \
+		chart_name=$$(echo $$base | sed -E "s/-[0-9]+\.[0-9]+\.[0-9]+$$//"); \
+		echo "Base: $$base"; \
+		echo "Extracted version: $$chart_version"; \
+		echo "Chart name: $$chart_name"; \
+		echo "Verifying if chart $$chart_name, version $$chart_version exists in $(REGISTRY_REPO)"; \
+		output=$$($(HELM) pull $$repo_flag $(REGISTRY_REPO)/$$chart_name --version $$chart_version --destination /tmp 2>&1); \
+		exit_code=$$?; \
+		if [ "$$exit_code" -eq 0 ]; then \
+			echo "Chart $$chart_name version $$chart_version already exists in the repository."; \
+		elif echo "$$output" | grep -q "not found"; then \
+			echo "Chart $$chart_name version $$chart_version does not exist in the repository. Pushing it now."; \
+			if $(REGISTRY_IS_OCI); then \
+				echo "Pushing $$chart to OCI registry $(REGISTRY_REPO)"; \
+				$(HELM) push "$$chart" $(REGISTRY_REPO); \
+			else \
+				if [ ! $$REGISTRY_USERNAME ] || [ ! $$REGISTRY_PASSWORD ]; then \
+					echo "Error: REGISTRY_USERNAME and REGISTRY_PASSWORD must be set for non-OCI registries."; \
+					echo "Example: export REGISTRY_USERNAME=myuser REGISTRY_PASSWORD=mypassword"; \
+					exit 1; \
+				fi; \
+				$(HELM) repo add hmc $(REGISTRY_REPO); \
+				echo "Pushing $$chart to non-OCI registry $(REGISTRY_REPO)"; \
+				$(HELM) cm-push "$$chart" $(REGISTRY_REPO) --username $$REGISTRY_USERNAME --password $$REGISTRY_PASSWORD; \
+			fi; \
+		else \
+			echo "Error while checking chart $$chart_name version $$chart_version: $$output"; \
+			exit 1; \
+		fi; \
+	done
+
+# .PHONY: helm-push
+# helm-push: helm-package
+# 	@if [ "$(SKIP_KIND)" = "true" ]; then \
+# 	    echo "SKIP_KIND is true. Skipping Helm push."; \
+# 	else \
+# 	    export HELM_EXPERIMENTAL_OCI=1; \
+# 	    if [ ! $(REGISTRY_IS_OCI) ]; then \
+# 	        repo_flag="--repo"; \
+# 	    fi; \
+# 	    for chart in $(CHARTS_PACKAGE_DIR)/*.tgz; do \
+# 	        base=$$(basename $$chart .tgz); \
+# 	        chart_version=$$(echo $$base | grep -o "v[0-9]\+\.[0-9]\+\.[0-9].*"); \
+# 	        chart_name="$${base%-"$$chart_version"}"; \
+# 	        echo "Verifying if chart $$chart_name, version $$chart_version exists in $(REGISTRY_REPO)"; \
+# 	        chart_exists=$$($(HELM) pull $$repo_flag $(REGISTRY_REPO)/$$chart_name --version $$chart_version --destination /tmp 2>&1 | grep -q "not found" && echo false || echo true); \
+# 	        if [ "$$chart_exists" = "true" ]; then \
+# 	            echo "Chart $$chart_name version $$chart_version already exists in the repository."; \
+# 	        else \
+# 	            if $(REGISTRY_IS_OCI); then \
+# 	                echo "Pushing $$chart to OCI registry $(REGISTRY_REPO)"; \
+# 	                $(HELM) push "$$chart" $(REGISTRY_REPO); \
+# 	            else \
+# 	                if [ ! $$REGISTRY_USERNAME ] || [ ! $$REGISTRY_PASSWORD ]; then \
+# 	                    echo "Error: REGISTRY_USERNAME and REGISTRY_PASSWORD must be set for non-OCI registries."; \
+# 	                    echo "Example: export REGISTRY_USERNAME=myuser REGISTRY_PASSWORD=mypassword"; \
+# 	                    exit 1; \
+# 	                fi; \
+# 	                $(HELM) repo add hmc $(REGISTRY_REPO); \
+# 	                echo "Pushing $$chart to non-OCI registry $(REGISTRY_REPO)"; \
+# 	                $(HELM) cm-push "$$chart" $(REGISTRY_REPO) --username $$REGISTRY_USERNAME --password $$REGISTRY_PASSWORD; \
+# 	            fi; \
+# 	        fi; \
+# 	    done; \
+# 	fi
 
 
 # kind doesn't support load docker-image if the container tool is podman
