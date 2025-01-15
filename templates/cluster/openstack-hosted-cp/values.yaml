@@ -1,0 +1,59 @@
+# cluster parameters
+controlPlaneNumber: 3
+workersNumber: 2
+
+clusterNetwork:
+  pods:
+    cidrBlocks:
+    - "10.244.0.0/16"
+  services:
+    cidrBlocks:
+    - "10.96.0.0/12"
+  serviceDomain: "cluster.local"
+
+identityRef:
+  name: "openstack-cloud-config"
+  cloudName: "openstack"
+  region: "RegionOne"
+
+bastion:
+  enabled: false
+  spec:
+    flavor: ""
+    image:
+      filter:
+        name: ""
+
+managedSecurityGroups:
+  allowAllInClusterTraffic: false
+
+managedSubnets:
+- cidr: 10.6.0.0/24
+
+apiServerLoadBalancer:
+  enabled: true
+
+externalNetwork:
+  filter:
+    name: "public"
+
+sshKeyName: "bnr-vm"
+flavor: "m1.medium"
+image:
+  filter:
+    name: "ubuntu-20.04"
+portOpts: []
+securityGroups:
+  - filter:
+      name: "default"
+      description: ""
+      projectID: ""
+
+k0smotron:
+  service:
+    type: LoadBalancer
+    apiPort: 6443
+    konnectivityPort: 8132
+
+k0s:
+  version: v1.30.5+k0s.0

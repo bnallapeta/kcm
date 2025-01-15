@@ -1,0 +1,26 @@
+apiVersion: k0rdent.mirantis.com/v1alpha1
+kind: ClusterDeployment
+metadata:
+  name: openstack-dev-hosted-cp
+  namespace: ${NAMESPACE}
+spec:
+  template: openstack-hosted-cp-0-0-1
+  credential: openstack-cluster-identity-cred
+  config:
+    controlPlaneNumber: 3
+    workersNumber: 2
+    identityRef:
+      name: "openstack-cloud-config"
+      cloudName: "openstack"
+      region: "RegionOne"
+    controlplane:
+      flavor: "m1.medium"
+      image:
+        filter:
+          name: "ubuntu-20.04"
+    worker:
+      flavor: "m1.medium"
+      image:
+        filter:
+          name: "ubuntu-20.04"
+    authURL: "https://keystone.ic-eu.ssl.mirantis.net/"
