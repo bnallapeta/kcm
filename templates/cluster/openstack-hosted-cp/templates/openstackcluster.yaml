@@ -32,7 +32,11 @@ spec:
   managedSecurityGroups:
     {{- toYaml .Values.managedSecurityGroups | nindent 4 }}
   {{- end }}
-  {{- if .Values.managedSubnets }}
-  managedSubnets:
-    {{- toYaml .Values.managedSubnets | nindent 4 }}
+  {{- if .Values.router }}
+  router:
+    {{- toYaml .Values.router | nindent 4 }}
+  {{- end }}
+  {{- if .Values.subnets }}
+  subnets:
+    {{- toYaml .Values.subnets | nindent 4 }}
   {{- end }}

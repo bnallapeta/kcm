@@ -196,11 +196,44 @@
           }
         }
       },
-      "portOpts": {
+      "router": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name of the image"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },      
+      "ports": {
         "type": "array",
         "description": "Ports to be attached to the server instance",
         "items": {
-          "type": "string"
+          "type": "object",
+          "properties": {
+            "network": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "ID of the network to which the port belongs"
+                }
+              },
+              "required": ["id"]
+            }
+          },
+          "required": ["network"]
         }
       },
       "securityGroups": {

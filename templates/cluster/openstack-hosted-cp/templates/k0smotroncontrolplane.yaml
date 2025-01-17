@@ -3,6 +3,9 @@ kind: K0smotronControlPlane
 metadata:
   name: {{ include "k0smotroncontrolplane.name" . }}
 spec:
+  etcd:
+    persistence:
+      storageClass: {{ .Values.k0smotron.etcd.persistence.storageClass }}
   controllerPlaneFlags:
   - "--enable-cloud-provider=true"
   - "--kubelet-extra-args=--cloud-provider=external"

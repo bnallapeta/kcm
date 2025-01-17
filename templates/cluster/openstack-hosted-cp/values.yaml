@@ -42,14 +42,24 @@ flavor: "m1.medium"
 image:
   filter:
     name: "ubuntu-20.04"
-portOpts: []
+ports:
+  - network:
+      id: "5b26fcab-50b6-4984-a5eb-06ef9d038fb3"
+router:
+  filter:
+    name: "k8s-clusterapi-cluster-kcm-system-openstack-dev"
 securityGroups:
   - filter:
-      name: "default"
-      description: ""
-      projectID: ""
+      name: "k8s-cluster-kcm-system-openstack-dev-secgroup-worker"
+subnets:
+  - filter:
+      name: "k8s-clusterapi-cluster-kcm-system-openstack-dev"
+
 
 k0smotron:
+  etcd:
+    persistence:
+      storageClass: "csi-cinder-sc-retain"
   service:
     type: LoadBalancer
     apiPort: 6443

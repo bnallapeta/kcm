@@ -19,14 +19,14 @@ spec:
             - {{ $tag }}
             {{- end }}
           {{- end }}
-      {{- if gt (len .Values.portOpts) 0 }}
-      portOpts:
-        {{ .Values.portOpts | toYaml | nindent 8 }}
+      {{- if .Values.ports }}
+      ports:
+        {{ .Values.ports | toYaml | nindent 8 }}
       {{- end }}
       {{- if gt (len .Values.securityGroups) 0 }}
       securityGroups:
         {{ .Values.securityGroups | toYaml | nindent 8 | trim }}
       {{- end }}
-      {{- if not ( .Values.sshPublicKey | empty) }}
-      sshKeyName: {{ .Values.sshPublicKey }}
+      {{- if not ( .Values.sshKeyName | empty) }}
+      sshKeyName: {{ .Values.sshKeyName }}
       {{- end }}      
